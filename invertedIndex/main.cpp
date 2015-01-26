@@ -70,7 +70,7 @@ int invertedListIntoFile(struct visualWord*);
 
 int trainingImgNumber = 0;//图片训练集的图片数
 const string trainingImgDir = "/Users/xuhuaiyu/Development/trainingImgs";//图片训练集目录
-const int clusterNumber = 10000;//K-means聚类的K值
+const int clusterNumber = 10;//K-means聚类的K值
 
 
 struct imgInfo{//图片词频节点
@@ -145,7 +145,7 @@ int main(int argc, const char * argv[]) {
         allDescriptors.release();//释放矩阵空间
         
         cout << " <dictionary 写入文件。。 > " << endl;
-        FileStorage fs("/Users/xuhuaiyu/Development/trainingResults/dictionary.yml", FileStorage::WRITE);
+        FileStorage fs("/Users/xuhuaiyu/Development/trainingResults/dictionary_test.yml", FileStorage::WRITE);
         fs << "vocabulary" << center;
         fs.release();
         cout << " <dictionary 写入文件完毕 > " << endl;
@@ -166,15 +166,16 @@ int main(int argc, const char * argv[]) {
         list<struct imgInfo>::iterator  itor;//构造list的迭代器，准备对每张图片进行遍历
         itor = imgs.begin();
 
+        
+        vector<vector<int>> pointIdxsOfClusters;//Indices of keypoints that belong to the cluster.
+        
         for(int i = 0; i<trainingImgNumber && itor != imgs.end(); itor++,i++){
             string imgName = imgSet.getImgName(i);
             cout<<"<第"<<i+1<<"张：图片名："<<imgName<<">"<<endl;
             Mat img = imread(imgName);
-            itor->histogram = countWordsFreq(img, itor->keypoint, NULL, bowDE);
+            itor->histogram = countWordsFreq(img, itor->keypoint, &pointIdxsOfClusters, bowDE);
         }
         cout << "< 统计词频完毕 >" << endl;
-        cout<<"-----------------------------------"<<endl<<endl;
-        
         
         
         //词频写入文件(即TF)
@@ -266,7 +267,7 @@ int main(int argc, const char * argv[]) {
         
         
         Mat dictionary;
-        FileStorage fs("/Users/xuhuaiyu/Development/trainingResults/dictionary.yml", FileStorage::READ);
+        FileStorage fs("/Users/xuhuaiyu/Development/trainingResults/dictionary_test.yml", FileStorage::READ);
         fs["vocabulary"] >> dictionary;
         fs.release();
         cout << "< 统计词频 >" << endl;
@@ -467,8 +468,23 @@ Mat k_means(Mat& allDescriptors, int clusterNum){
                           cvTermCriteria (CV_TERMCRIT_EPS + CV_TERMCRIT_ITER, 10, 0.1),3,2);
     return bowK.cluster(allDescriptors);
 }
+/**
+ 1.聚成10类
+ 2.将特征点按照聚类中心分割成10部分
+ */
 
-
+void recursionKmeans(Mat allDescriptors){//分层聚类的每一次聚类
+    BOWKMeansTrainer bowK(10, cvTermCriteria (CV_TERMCRIT_EPS + CV_TERMCRIT_ITER, 10, 0.1),3,2);
+    Mat dictionary = bowK.cluster(allDescriptors);//每次聚成10类
+    
+    Ptr<DescriptorExtractor> extractor = DescriptorExtractor::create("SIFT");
+    Ptr<DescriptorMatcher>  matcher = DescriptorMatcher::create("BruteForce");
+    BOWImgDescriptorExtractor bowDE(extractor, matcher);
+    bowDE.setVocabulary(dictionary);
+    
+    
+    
+}
 
 
 
@@ -600,7 +616,7 @@ int matchImg(string imgPath){
     
     cout<<"读入视觉单词表"<<endl;
     Mat dictionary;
-    fs.open("/Users/xuhuaiyu/Development/trainingResults/dictionary.yml", FileStorage::READ);//读入训练过程中构建的视觉单词表
+    fs.open("/Users/xuhuaiyu/Development/trainingResults/dictionary2.yml", FileStorage::READ);//读入训练过程中构建的视觉单词表
     fs["vocabulary"] >> dictionary;
     fs.release();
     cout<<"读取完毕"<<endl;
