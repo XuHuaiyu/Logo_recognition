@@ -65,7 +65,8 @@ Mat countWordsFreq(Mat&, vector<KeyPoint> , vector<vector<int>>*, BOWImgDescript
 void buildWordsList(int, struct visualWord* );//构建视觉单词表
 void buildInvertedIndex(struct imgInfo*,  int,  int, struct visualWord*);//构建倒排列表
 //int matchImg(int*, struct visualWord);//相似度匹配
-int matchImg(string );
+vector<int> matchImg(string );//匹配图片
+void imshowMany(const std::string& _winName, const vector<Mat>& _imgs);//一个窗口显示多幅图片
 double cosSimlarity(int*, int*, int);//计算余弦相似度
 int wordsFreqIntoFile(struct imgInfo*);
 int invertedListIntoFile(struct visualWord*);
@@ -234,36 +235,6 @@ int main(int argc, const char * argv[]) {
         fs.release();
         cout << " <TF-IDF 写入文件完毕 > " << endl;
 
-        
-//        cout << "< 建立倒排索引的单词表 >" << endl;
-//        struct visualWord* wordsList = new struct visualWord[clusterNumber];//视觉单词表数组
-//        buildWordsList(clusterNumber, wordsList);//构建单词表
-//        cout << "< 建立倒排索引的单词表完毕 >" << endl;
-//        cout<<"-----------------------------------"<<endl<<endl;
-//        //    wordsFreq二维数组用来记录词频
-//        //    int** wordsFreq = new int*[trainingImgNumber]; //存储每幅图像的直方图表示，每一行对应一幅图像
-//        //    for(int i = 0 ;i < trainingImgNumber ; i ++ ){//每一列代表一个聚类后视觉单词表的单词词频
-//        //        wordsFreq[i] = new int[clusterNumber];
-//        //    }
-//        
-//        
-//        cout << "< 建立倒排列表 >" << endl;
-//        //    buildInvertedIndex(imgs, clusterNumber, trainingImgNumber, wordsList);//构建倒排列表
-//        cout << "< 建立倒排列表完毕 >" << endl;
-//        cout<<"-----------------------------------"<<endl<<endl;
-//        
-//        cout<<"<倒排索引写入文件>"<<endl;
-//        if(invertedListIntoFile(wordsList) == 0){
-//            cout<<"<倒排索引写入文件成功>"<<endl;
-//        }else{
-//            cout<<"<倒排索引写入文件失败>"<<endl;
-//            return 1;
-//        }
-//        cout<<"-----------------------------------"<<endl<<endl;
-//        
-//        cout<<"<logo识别器训练完毕>"<<endl;
-//        
-//        cout<<"<开始尝试图片识别：>"<<endl;
     }
     
     
@@ -381,22 +352,25 @@ int main(int argc, const char * argv[]) {
         string imgPath ;
         cout<<"请输入所需要匹配的图片路径："<<endl;
         cin >> imgPath;
-        int idx = matchImg(imgPath);
-        cout<<"匹配到的图片编号为："<<idx<<endl;
+        vector<int> idxs = matchImg(imgPath);
+        
 
         ImgSet imgSet ;
         
-//        cout<<"<开始加载训练集图片>"<<endl;
+
         imgSet.loadImgsFromDir(trainingImgDir) ;//加载训练集中的所有图片
-//        cout <<"<加载训练集图片完毕>"<<endl;
-        string imgName = imgSet.getImgName(idx);
-        double scale = 0.25;
-        Mat image = imread(imgName);
-        Size dsize = Size(image.cols*scale,image.rows*scale);
-        Mat result = Mat(dsize,CV_32S);
-        resize(image, result, dsize);
-        namedWindow("最为相似的图片",CV_WINDOW_AUTOSIZE);
-        imshow("最为相似的图片",result);
+        vector<Mat> _imgs;
+        for(int i = 0; i < idxs.size();i++){
+            string imgName = imgSet.getImgName(idxs[i]);
+            Mat image = imread(imgName);
+            _imgs.push_back(image);
+        }
+
+        string _winName = "相似度匹配结果";
+
+
+        imshowMany(_winName, _imgs);
+
         waitKey();
     }
     return 0;
@@ -482,117 +456,14 @@ Mat h_kmeans(Mat& allDescriptors, int clusterNum){
     cout<<"共聚类成"<<true_number_clusters<<"类"<<endl;
     return centers.rowRange(cv::Range(0,true_number_clusters));
 }
-/**
- 1.聚成10类,获得长度为10的词典
- 2.利用bowDE.compute（）传入词典，计算每张图片的描述子的分类，并汇总
- 3.递归计算
- 将特征点按照聚类中心分割成10部分
- */
 
-//void recursionKmeans(Mat allDescriptors, list<struct imgInfo>& imgs){//分层聚类的每一次聚类
-//    BOWKMeansTrainer bowK(10, cvTermCriteria (CV_TERMCRIT_EPS + CV_TERMCRIT_ITER, 10, 0.1),3,2);
-//    Mat dictionary = bowK.cluster(allDescriptors);//每次聚成10类
-//    
-//    Ptr<DescriptorExtractor> extractor = DescriptorExtractor::create("SIFT");
-//    Ptr<DescriptorMatcher>  matcher = DescriptorMatcher::create("BruteForce");
-//    BOWImgDescriptorExtractor bowDE(extractor, matcher);
-//    bowDE.setVocabulary(dictionary);
-//    
-//    
-//    
-//   
-//    
-//    Mat imgDescriptor;//单行矩阵，词频向量，在此处用不着了
-//    vector< vector<int> > pointIdxsOfClusters;
-//    
-//    list<struct imgInfo>::iterator  itor;//构造list的迭代器，准备对每张图片进行遍历
-//    itor = imgs.begin();
-//    
-//    
-//    Ptr<DescriptorExtractor> descriptorExtractor = DescriptorExtractor::create( "SIFT" );
-//    if(descriptorExtractor.empty())
-//    {
-//        cout << "Can not create detector or descriptor extractor of given types" << endl;
-//        return ;
-//    }
-//    
-//    
-//    
-//    Mat descriptors[clusterNumber];//属于各个聚类中心的描述子
-//    for(int i = 0; i<imgs.size() && itor != imgs.end(); itor++,i++){//i表征 第i张照片
-//        vector< vector<KeyPoint> > kptOfClst(clusterNumber);//将每张图片中的关键点按照聚类中心进行分类,此处用来存储关键点下标
-//        string imgName = itor->imgPath;
-//        cout<<"<第"<<i+1<<"张：图片名："<<imgName<<">"<<endl;
-//        Mat img = imread(imgName);
-//        //注意，在compute中传入的keypoint不是一张图片中所有的keypoint！！！
-//        bowDE.compute(img, itor->keypoint, imgDescriptor, &pointIdxsOfClusters);//此处pointIdxsOfClusters记录每个聚类中心所包含的关键点下标
-//        
-//        /**
-//         下面的循环将一张图片的所有关键点分别归类到对应的聚类中心
-//         */
-//        for(int k = 0; k < pointIdxsOfClusters.size(); k++){//k表征第k类聚类中心
-//            for(int t = 0; t < pointIdxsOfClusters[k].size(); t++){//t表征属于一个聚类中心的第t个关键点
-//                int idx = pointIdxsOfClusters[k][t];//关键点下标
-//                kptOfClst[k].push_back(itor->keypoint[idx]);//将图片的第idx个关键点进行归类
-//            }
-//        }
-//        /**
-//         下面的循环对一张图片，已经按照聚类中心归类的关键点，重新计算描述子（重新计算后的结果与之前的计算结果不会有变化，应当可以不用重新计算描述子，直接使用已经计算出来的描述子）
-//         */
-//        for(int k = 0; k < clusterNumber; k++){//分别
-//            Mat tempDescriptors;
-//            descriptorExtractor->compute( img, kptOfClst[k], tempDescriptors );//将属于第i类
-//            
-//        }
-//            
-//        descriptorExtractor->compute( img, keypoint, descriptors );
-//        
-//    }
-//
-//    
-//
-//    
-//}
-//
-
-
-/**
- 对于每张图片统计词频
- 
- img:需要统计词频的图像
- keypoint：该图像对应的关键点
- pointIdxOfClusters：每个聚类中心对应的关键点下标（始终传入NULL）
- bowDE:
- */
 
 Mat countWordsFreq(Mat &img, vector<KeyPoint> keypoint, vector<vector<int>>* pointIdxsOfClusters, BOWImgDescriptorExtractor bowDE){
     Mat  imgDiscriptor;//该矩阵只有一行，即为normalized histogram,即TF
     
     bowDE.compute(img, keypoint, imgDiscriptor, pointIdxsOfClusters);
-    
-//    cout<<"归一化词频统计数据"<<endl;
-//    cout<<"[";
-//    for (int i = 0; i < imgDiscriptor.cols; i++)
-//        cout << imgDiscriptor.at<float>(0, i) << "+";
-//    cout<<"]"<<endl;
     return imgDiscriptor;
 }
-
-
-/**
- 构建单词表
- 
- wordsNum： 视觉单词表的单词数目
- wordsList：（倒排索引结构中的）单词表
- */
-//void buildWordsList(int wordsNum, struct visualWord* wordsList, struct wordsFreqNode* wordsFreq){
-//    wordsList = new struct visualWord[wordsNum];
-//    for(int i = 0 ; i < wordsNum ; i ++ ){//initialize the wordsList
-////        wordsList[i].imgPath = wordsFreq[i].imgPath;
-//        wordsList[i].next = NULL;
-//    }
-//
-//}
 
 void buildWordsList(int wordsNum, struct visualWord* wordsList){
     wordsList = new struct visualWord[wordsNum];
@@ -602,37 +473,7 @@ void buildWordsList(int wordsNum, struct visualWord* wordsList){
     }
 }
 
-/**
- 构建倒排例表
- 
- wordsFreq： 所有图片对应的词频数据
- row：图片数
- col：视觉单词表的单词数
- wordsList：(倒排索引结构中的)单词表
- */
-void buildInvertedIndex(struct imgInfo* wordsFreq, int row, int col, struct visualWord* wordsList){
-    /*
-     1.每个倒排列表的节点存储图片ID，以及对应图片的非零词频
-     2.单词表中各个单词所指向的图片链表中的每张图片都为含有属于该类单词的特征点
-     */
-    
-    
-    //列优先遍历wordFreq二维数组
-//    for(int i = 0 ; i < col ; i ++){
-//        for(int j = 0; j < row; j++){
-//            if (wordsFreq[j].freq[i] != 0 ) {//第i个单词特征在第j张图片中出现
-//                //头插法构建倒排列表
-//                struct invertedTableNode* tmpNode = (struct invertedTableNode*)malloc(sizeof(struct invertedTableNode));
-//                tmpNode->picId = j;
-//                
-//                //此处仅仅存储图片的id，对于图片对应的词频向量不进行重复存储
-//                tmpNode->next = wordsList[j].next;
-//                wordsList[j].next = tmpNode;
-//                wordsList[j].imgAmt ++;
-//            }
-//        }
-//    }
-}
+
 
 /**
  倒排索引写入文件
@@ -670,7 +511,21 @@ int invertedListIntoFile(struct visualWord* wordsList){
     return 0;
 }
 
-int matchImg(string imgPath){
+typedef struct pic{
+    int id;
+    double similarity;
+    
+    bool operator <(const pic &other)const   //升序排序
+    {
+        return similarity<other.similarity;
+    }
+    bool operator >(const pic &other)const   //降序排序
+    {
+        return similarity>other.similarity;
+    }
+}pic;
+
+vector<int> matchImg(string imgPath){
     Mat tfIdfOfBase;//训练集中每幅图片的tf_idf
     
     
@@ -732,8 +587,9 @@ int matchImg(string imgPath){
     cout<<"读取完毕"<<endl;
 
     cout<<"开始相似图片匹配"<<endl;
-    int k = -1;//用来记录相似度最高的图片的id号
-    double similarity = -1;//用来表征相似度
+
+    vector<pic> results(6);
+
     int flag[clusterNumber] = {0};
     for(int i = 0 ; i < tfIdfOfImg.cols; i ++ ){
         
@@ -758,55 +614,105 @@ int matchImg(string imgPath){
                     vector1Modulo = sqrt(vector1Modulo);
                     vector2Modulo = sqrt(vector2Modulo);
                     double temp = vectorMultiply/(vector1Modulo*vector2Modulo);
-                    if (temp > similarity) {
-                        k = id;
-                        similarity = temp;
+                    for(int t = 5; t >=0; t--){
+                        if(results[t].similarity < temp){
+                            results[0].id = id;
+                            results[0].similarity = temp;
+                            break;
+                        }
                     }
-                }
+                    sort(results.begin(),results.end());
+                 }
             }
             
         }
     }
+    vector<int> ids;
+    cout<<"from matImg"<<endl;
     
-    return k;
+    for(int i = 5 ; i >= 0 ; i-- ){
+        cout<<results[i].id<<" ";
+        ids.push_back(results[i].id);
+    }
+    return ids;
+//    return k;
+}
+int cmp(const pair<int,float>& x, const pair<int,float>& y){
+    return x.second < y.second;
+}
+void imshowMany(const std::string& _winName, const vector<Mat>& _imgs)
+{
+    int nImg = (int)_imgs.size();
+    
+    Mat dispImg;
+    int size;
+    int x, y;
+    // w - Maximum number of images in a row
+    // h - Maximum number of images in a column
+    int w, h;
+    // scale - How much we have to resize the image
+    float scale;
+    int max;
+    if (nImg <= 0)
+    {
+        printf("Number of arguments too small....\n");
+        return;
+    }
+    else if (nImg > 12)
+    {
+        printf("Number of arguments too large....\n");
+        return;
+    }
+    
+    else if (nImg == 1)
+    {
+        w = h = 1;
+        size = 300;
+    }
+    else if (nImg == 2)
+    {
+        w = 2; h = 1;
+        size = 300;
+    }
+    else if (nImg == 3 || nImg == 4)
+    {
+        w = 2; h = 2;
+        size = 300;
+    }
+    else if (nImg == 5 || nImg == 6)
+    {
+        w = 3; h = 2;
+        size = 300;
+    }
+    else if (nImg == 7 || nImg == 8)
+    {
+        w = 4; h = 2;
+        size = 200;
+    }
+    else
+    {
+        w = 4; h = 3;
+        size = 150;
+    }
+    dispImg.create(Size(100 + size*w, 60 + size*h), CV_8UC3);
+    for (int i= 0, m=20, n=20; i<nImg; i++, m+=(20+size))
+    {
+        x = _imgs[i].cols;
+        y = _imgs[i].rows;
+        max = (x > y)? x: y;
+        scale = (float) ( (float) max / size );
+        if (i%w==0 && m!=20)
+        {
+            m = 20;
+            n += 20+size;
+        }
+        Mat imgROI = dispImg(Rect(m, n, (int)(x/scale), (int)(y/scale)));
+        resize(_imgs[i], imgROI, Size((int)(x/scale), (int)(y/scale)));
+    }
+    namedWindow(_winName);
+    imshow(_winName, dispImg);
 }
 
-/**
- 相似度匹配
- wordFreq：代检测图片的词频向量
- wordsList：已构建好的倒排索引
- wordsFreq: 所有图片对应的词频向量
- wordsNum: 单词表长度
- 
- return:余弦相似度最大的图片id
- 
- */
-//int matchImg(int* wordFreq, struct visualWord* wordsList, int** wordsReq, int wordsNum){
-//    //    int wordsNum = sizeof(wordsList)/sizeof(struct visualWord);//单词表长度
-//    
-//    
-//    int* flag = new int[wordsNum];//标记对应图片是否已计算过相似度,避免重复计算
-//    flag = {0};
-//    
-//    double similarity = -1;//记录余弦相似度
-//    int finalImg = -1;//记录余弦相似度最大的图片
-//    for(int i = 0 ; i < wordsNum; i ++ ){
-//        if(wordFreq[i] != 0){//第i类视觉单词的词频大于0
-//            //计算余弦相似度
-//            struct invertedTableNode* possibleImg = wordsList[i].next;
-//            while(possibleImg != NULL && flag[possibleImg->picId] == 0 ){
-//                //取出对应图片的词频向量
-//                double tmp = cosSimlarity(wordFreq, wordsReq[i], wordsNum);
-//                finalImg = i;
-//                flag[finalImg] = 1;//标识该图片已进行匹对过
-//                
-//                similarity = similarity > tmp? similarity:tmp;
-//                possibleImg = possibleImg->next;
-//            }
-//        }
-//    }
-//    return finalImg;
-//}
 
 /**
  计算余弦相似度
