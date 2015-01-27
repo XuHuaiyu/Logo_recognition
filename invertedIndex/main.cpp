@@ -34,6 +34,8 @@
 #include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/features2d/features2d.hpp"
 #include "opencv2/nonfree/nonfree.hpp"
+#include "opencv2/flann/flann.hpp"   //包含分层kmeans方法的头文件
+
 #include "SIFTDescriptor.h"
 #include "ImgSet.h"
 #include <iostream>
@@ -57,6 +59,7 @@ using namespace std;
 Mat extractSIFTDescriptor(string dir, ImgSet imgSet,list<struct imgInfo>& imgs);
 
 Mat k_means(Mat& , int );//k-means聚类
+Mat h_kmeans(Mat&, int);//hierarchical k_means
 //struct wordsFreqNode* countWordsFreq(Mat, SIFTDiscriptor*);//计算词频
 Mat countWordsFreq(Mat&, vector<KeyPoint> , vector<vector<int>>*, BOWImgDescriptorExtractor);//计算一幅图片的词频
 void buildWordsList(int, struct visualWord* );//构建视觉单词表
@@ -70,13 +73,14 @@ int invertedListIntoFile(struct visualWord*);
 
 int trainingImgNumber = 0;//图片训练集的图片数
 const string trainingImgDir = "/Users/xuhuaiyu/Development/trainingImgs";//图片训练集目录
-const int clusterNumber = 10;//K-means聚类的K值
+const int clusterNumber = 100000;//K-means聚类的K值
 
 
 struct imgInfo{//图片词频节点
     string imgPath;
-    vector<KeyPoint> keypoint;
-    Mat histogram;
+    vector<KeyPoint> keypoint;//关键点
+    Mat descriptors;//描述子
+    Mat histogram;//词频
 
 };
 struct visualWord{//视觉单词表结构体
@@ -139,8 +143,9 @@ int main(int argc, const char * argv[]) {
         
         
         cout << "< K-means聚类 >" << endl;
-        Mat center = k_means(allDescriptors, clusterNumber);//center矩阵存储视觉单词表
+        Mat center = h_kmeans(allDescriptors, clusterNumber);//center矩阵存储视觉单词表
         cout << "< K-means聚类完毕 >" << endl;
+        
         cout<<"-----------------------------------"<<endl<<endl;
         allDescriptors.release();//释放矩阵空间
         
@@ -441,7 +446,7 @@ Mat extractSIFTDescriptor(string dir, ImgSet imgSet, list<struct imgInfo>& imgs)
         
         Mat descriptors;//特征描述子
         descriptorExtractor->compute( img, keypoint, descriptors );
-
+        image.descriptors = descriptors;
         imgs.push_back(image);
 
         allDescriptors.push_back(descriptors);//将该图像所有特征点的特征描述符附加到总特征描述符矩阵的末尾
@@ -468,24 +473,87 @@ Mat k_means(Mat& allDescriptors, int clusterNum){
                           cvTermCriteria (CV_TERMCRIT_EPS + CV_TERMCRIT_ITER, 10, 0.1),3,2);
     return bowK.cluster(allDescriptors);
 }
+
+
+Mat h_kmeans(Mat& allDescriptors, int clusterNum){
+    cvflann::KMeansIndexParams kmeans_param;
+    Mat centers(clusterNumber,128,CV_32F);
+    int true_number_clusters = flann::hierarchicalClustering<flann::L2<float>>(allDescriptors, centers, kmeans_param);//真正提取的特征值数量
+    cout<<"共聚类成"<<true_number_clusters<<"类"<<endl;
+    return centers.rowRange(cv::Range(0,true_number_clusters));
+}
 /**
- 1.聚成10类
- 2.将特征点按照聚类中心分割成10部分
+ 1.聚成10类,获得长度为10的词典
+ 2.利用bowDE.compute（）传入词典，计算每张图片的描述子的分类，并汇总
+ 3.递归计算
+ 将特征点按照聚类中心分割成10部分
  */
 
-void recursionKmeans(Mat allDescriptors){//分层聚类的每一次聚类
-    BOWKMeansTrainer bowK(10, cvTermCriteria (CV_TERMCRIT_EPS + CV_TERMCRIT_ITER, 10, 0.1),3,2);
-    Mat dictionary = bowK.cluster(allDescriptors);//每次聚成10类
-    
-    Ptr<DescriptorExtractor> extractor = DescriptorExtractor::create("SIFT");
-    Ptr<DescriptorMatcher>  matcher = DescriptorMatcher::create("BruteForce");
-    BOWImgDescriptorExtractor bowDE(extractor, matcher);
-    bowDE.setVocabulary(dictionary);
-    
-    
-    
-}
-
+//void recursionKmeans(Mat allDescriptors, list<struct imgInfo>& imgs){//分层聚类的每一次聚类
+//    BOWKMeansTrainer bowK(10, cvTermCriteria (CV_TERMCRIT_EPS + CV_TERMCRIT_ITER, 10, 0.1),3,2);
+//    Mat dictionary = bowK.cluster(allDescriptors);//每次聚成10类
+//    
+//    Ptr<DescriptorExtractor> extractor = DescriptorExtractor::create("SIFT");
+//    Ptr<DescriptorMatcher>  matcher = DescriptorMatcher::create("BruteForce");
+//    BOWImgDescriptorExtractor bowDE(extractor, matcher);
+//    bowDE.setVocabulary(dictionary);
+//    
+//    
+//    
+//   
+//    
+//    Mat imgDescriptor;//单行矩阵，词频向量，在此处用不着了
+//    vector< vector<int> > pointIdxsOfClusters;
+//    
+//    list<struct imgInfo>::iterator  itor;//构造list的迭代器，准备对每张图片进行遍历
+//    itor = imgs.begin();
+//    
+//    
+//    Ptr<DescriptorExtractor> descriptorExtractor = DescriptorExtractor::create( "SIFT" );
+//    if(descriptorExtractor.empty())
+//    {
+//        cout << "Can not create detector or descriptor extractor of given types" << endl;
+//        return ;
+//    }
+//    
+//    
+//    
+//    Mat descriptors[clusterNumber];//属于各个聚类中心的描述子
+//    for(int i = 0; i<imgs.size() && itor != imgs.end(); itor++,i++){//i表征 第i张照片
+//        vector< vector<KeyPoint> > kptOfClst(clusterNumber);//将每张图片中的关键点按照聚类中心进行分类,此处用来存储关键点下标
+//        string imgName = itor->imgPath;
+//        cout<<"<第"<<i+1<<"张：图片名："<<imgName<<">"<<endl;
+//        Mat img = imread(imgName);
+//        //注意，在compute中传入的keypoint不是一张图片中所有的keypoint！！！
+//        bowDE.compute(img, itor->keypoint, imgDescriptor, &pointIdxsOfClusters);//此处pointIdxsOfClusters记录每个聚类中心所包含的关键点下标
+//        
+//        /**
+//         下面的循环将一张图片的所有关键点分别归类到对应的聚类中心
+//         */
+//        for(int k = 0; k < pointIdxsOfClusters.size(); k++){//k表征第k类聚类中心
+//            for(int t = 0; t < pointIdxsOfClusters[k].size(); t++){//t表征属于一个聚类中心的第t个关键点
+//                int idx = pointIdxsOfClusters[k][t];//关键点下标
+//                kptOfClst[k].push_back(itor->keypoint[idx]);//将图片的第idx个关键点进行归类
+//            }
+//        }
+//        /**
+//         下面的循环对一张图片，已经按照聚类中心归类的关键点，重新计算描述子（重新计算后的结果与之前的计算结果不会有变化，应当可以不用重新计算描述子，直接使用已经计算出来的描述子）
+//         */
+//        for(int k = 0; k < clusterNumber; k++){//分别
+//            Mat tempDescriptors;
+//            descriptorExtractor->compute( img, kptOfClst[k], tempDescriptors );//将属于第i类
+//            
+//        }
+//            
+//        descriptorExtractor->compute( img, keypoint, descriptors );
+//        
+//    }
+//
+//    
+//
+//    
+//}
+//
 
 
 /**
