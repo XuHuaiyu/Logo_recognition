@@ -333,7 +333,7 @@ int main(int argc, const char * argv[]) {
                 }
             }
            // idfMat.at<float>(0,i) = trainingImgNumber*1.0/count;
-            idfMat.at<float>(0,i) = 52*1.0/count;
+            idfMat.at<float>(0,i) = 170*1.0/count;
         }
         
         cout<<" < 构建倒排列表完成 > "<<endl;
@@ -684,7 +684,7 @@ int matchImg(string imgPath){
     
     cout<<"读入视觉单词表"<<endl;
     Mat dictionary;
-    fs.open("/Users/xuhuaiyu/Development/trainingResults/dictionary2.yml", FileStorage::READ);//读入训练过程中构建的视觉单词表
+    fs.open("/Users/xuhuaiyu/Development/trainingResults/dictionary_test.yml", FileStorage::READ);//读入训练过程中构建的视觉单词表
     fs["vocabulary"] >> dictionary;
     fs.release();
     cout<<"读取完毕"<<endl;
@@ -834,7 +834,19 @@ double cosSimlarity(int* srcFreq, int* dstFreq, int wordsNum){
 }
 
 
-
+/**
+ 总结1：
+ 在使用flann::hierarchicalClustering<Distance>进行分层聚类时候
+ 三个参数的方法已经被弃用（deprecated），源代码中将返回值删除，若使用会出现无返回值的错误
+ int hierarchicalClustering(const Mat& features, Mat& centers, const ::cvflann::IndexParams& params)
+ 
+ 所以可使用的为四个参数的方法：
+ int hierarchicalClustering(const Mat& features, Mat& centers, const ::cvflann::IndexParams& params,
+ Distance d = Distance())
+ 
+ 在调用的时候，flann::hierarchicalClustering<float,float>(features, centers, kmeans_param);的调用方式已经不可用
+ 需要使用flann::hierarchicalClustering<flann::L2<float>>(features, centers, kmeans_param);的调用方式
+ */
 
 
 
