@@ -597,8 +597,8 @@ vector<int> matchImg(string imgPath){
             vector<int> imgsId = invertedList[i];//获得倒排索引中，第i个聚类中心对应的所有图片的id
             for(int j = 0 ; j < imgsId.size(); j ++ ){//遍历倒排索引中包含该视觉单词的所有图片
                 int id = imgsId[j];
-                if(flag[j] == 0){
-                    flag[j] = 1;
+                if(flag[id] == 0){//为防止发生重复计算
+                    flag[id] = 1;
                     double vectorMultiply = 0.00;//词频向量向量积
                     double vector1Modulo = 0.00;//待检测图片词频向量向量积
                     double vector2Modulo = 0.00;//图库内图片词频向量向量积
@@ -614,6 +614,7 @@ vector<int> matchImg(string imgPath){
                     vector1Modulo = sqrt(vector1Modulo);
                     vector2Modulo = sqrt(vector2Modulo);
                     double temp = vectorMultiply/(vector1Modulo*vector2Modulo);
+
                     for(int t = 5; t >=0; t--){
                         if(results[t].similarity < temp){
                             results[0].id = id;
@@ -622,6 +623,7 @@ vector<int> matchImg(string imgPath){
                         }
                     }
                     sort(results.begin(),results.end());
+                    
                  }
             }
             
